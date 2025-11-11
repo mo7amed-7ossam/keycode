@@ -1,106 +1,117 @@
-<!doctype html>
-<html lang="ar">
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
 
 <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Key & Binary Viewer</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Keyboard Binary - مباشر</title>
     <style>
         body {
-            font-family: system-ui, Arial;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            height: 100vh;
-            background: #f3f4f6;
-            margin: 0
+            font-family: "Segoe UI", system-ui, sans-serif;
+            background: #f0f2f5;
+            padding: 2rem;
+            color: #111;
+        }
+
+        h1 {
+            text-align: center;
+            color: #0058ff;
         }
 
         .card {
             background: #fff;
-            padding: 24px;
             border-radius: 12px;
-            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
-            min-width: 320px;
-            text-align: center
+            padding: 1rem 1.5rem;
+            margin: 1rem auto;
+            max-width: 600px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
         }
 
-        h1 {
-            margin: 0 0 12px 0;
-            font-size: 18px
+        pre {
+            background: #f9f9f9;
+            padding: 1rem;
+            border-radius: 8px;
+            overflow-x: auto;
+            font-family: Consolas, monospace;
+            white-space: pre-wrap;
         }
 
-        .big {
-            font-size: 32px;
-            font-weight: 700;
-            margin: 8px 0
-        }
+        @media (prefers-color-scheme: dark) {
+            body {
+                background: #121417;
+                color: #e8eaed;
+            }
 
-        .row {
-            display: flex;
-            justify-content: space-between;
-            margin: 6px 0;
-            font-size: 14px
-        }
+            .card {
+                background: #1e2126;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+            }
 
-        .hint {
-            margin-top: 12px;
-            color: #666;
-            font-size: 13px
-        }
-
-        .binary {
-            font-family: monospace;
-            color: #0b5;
-            letter-spacing: 2px
+            pre {
+                background: #181b1f;
+                color: #e8eaed;
+            }
         }
     </style>
 </head>
 
 <body>
+    <h1>🔤 أي ضغطة لوحة مفاتيح → باينري مباشر</h1>
+
     <div class="card">
-        <h1>اضغط أي زر على الكيبورد</h1>
-
-        <div class="row"><strong>Key (الرمز الظاهر):</strong><span id="key">—</span></div>
-        <div class="row"><strong>KeyCode (رقم):</strong><span id="keyCode">—</span></div>
-        <div class="row"><strong>Binary (8-bit):</strong><span id="binary" class="binary">—</span></div>
-
-        <div class="hint" dir="rtl">ملاحظة: بعض المتصفحات لا تدعم <code>keyCode</code> حديثًا، لكن معظمها لا يزال يرجع
-            قيمة رقمية.
-            العرض يحاول التعويض باستخدام char code لو احتاج الأمر.</div>
+        <p>اضغط أي زر على الكيبورد الآن (عربي، إنجليزي، إيموجي، أو أي رمز):</p>
+        <pre id="log">لم يتم الضغط بعد.</pre>
     </div>
 
     <script>
-        const elKey = document.getElementById('key');
-        const elCode = document.getElementById('code');
-        const elKeyCode = document.getElementById('keyCode');
-        const elBinary = document.getElementById('binary');
+        const log = document.getElementById('log');
 
-        function to8bitBinary(n) {
-            if (typeof n !== 'number' || isNaN(n)) return '00000000';
-            // لو الرقم أكبر من 255 نعرض بعدد بيت مناسب (مثلاً 16)
-            const width = n > 255 ? 16 : 8;
-            return n.toString(2).padStart(width, '0');
+        function toBin(n, bits = 0) {
+            let s = n.toString(2);
+            if (bits && s.length < bits) s = '0'.repeat(bits - s.length) + s;
+            return s;
         }
 
-        window.addEventListener('keydown', (e) => {
-            // تجميع القيم
-            const key = e.key;           // الحرف أو الوصف مثل "a", "Enter"
-            const code = e.code;         // موقع المفتاح الفيزيائي مثل "KeyA", "ArrowUp"
-            // بعض المتصفحات ما ترجع keyCode في keydown لبعض المفاتيح، فنحاول fallback
-            let keyCode = e.keyCode ?? e.which ?? 0;
-            // لو key هي حرف واحد ونرجع 0، استخدم charCode كبديل
-            if (!keyCode && typeof key === 'string' && key.length === 1) {
-                keyCode = key.charCodeAt(0);
+        function utf8Bytes(cp) {
+            if (cp <= 0x7F) return [cp];
+            if (cp <= 0x7FF) return [0xC0 | (cp >> 6), 0x80 | (cp & 0x3F)];
+            if (cp <= 0xFFFF) return [0xE0 | (cp >> 12), 0x80 | ((cp >> 6) & 0x3F), 0x80 | (cp & 0x3F)];
+            return [0xF0 | (cp >> 18), 0x80 | ((cp >> 12) & 0x3F), 0x80 | ((cp >> 6) & 0x3F), 0x80 | (cp & 0x3F)];
+        }
+
+        function analyzeChar(ch) {
+            const cp = ch.codePointAt(0);
+            const unicode = 'U+' + cp.toString(16).toUpperCase().padStart(4, '0');
+            const utf8 = utf8Bytes(cp);
+            const utf16 = [];
+            for (let i = 0; i < ch.length; i++) utf16.push(ch.charCodeAt(i));
+
+            let out = `🔹 الحرف: "${ch}"\n`;
+            out += `🔸 Unicode: ${unicode} (decimal: ${cp})\n`;
+            out += `🔸 Binary: ${toBin(cp)}\n\n`;
+
+            out += '🔸 UTF-8 bytes:\n';
+            utf8.forEach((b, i) => {
+                out += `  [${i}] ${b} | 0x${b.toString(16).toUpperCase().padStart(2, '0')} | ${toBin(b, 8)}\n`;
+            });
+
+            out += '\n🔸 UTF-16 code units:\n';
+            utf16.forEach((b, i) => {
+                out += `  [${i}] ${b} | 0x${b.toString(16).toUpperCase().padStart(4, '0')} | ${toBin(b, 16)}\n`;
+            });
+
+            log.textContent = out;
+        }
+
+        window.addEventListener('keydown', e => {
+            const key = e.key;
+            // لو حرف قابل للطباعة
+            if (key.length === 1) {
+                analyzeChar(key);
+            } else {
+                log.textContent = `⚡ مفتاح تحكم: "${key}"\n(ليس حرفاً للطباعة)`;
             }
-
-            elKey.textContent = String(key);
-            elKeyCode.textContent = String(keyCode);
-            elBinary.textContent = to8bitBinary(keyCode);
         });
-
-        // نمنع السلوك الافتراضي لبعض المفاتيح لو عايز تجرب (اختياري)
-        // window.addEventListener('keydown', e => { if (e.key === 'F1') e.preventDefault(); });
     </script>
 </body>
 
