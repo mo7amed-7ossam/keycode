@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="ar">
+
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Key & Binary Viewer</title>
+    <style>
+        body {
+            font-family: system-ui, Arial;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background: #f3f4f6;
+            margin: 0
+        }
+
+        .card {
+            background: #fff;
+            padding: 24px;
+            border-radius: 12px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.08);
+            min-width: 320px;
+            text-align: center
+        }
+
+        h1 {
+            margin: 0 0 12px 0;
+            font-size: 18px
+        }
+
+        .big {
+            font-size: 32px;
+            font-weight: 700;
+            margin: 8px 0
+        }
+
+        .row {
+            display: flex;
+            justify-content: space-between;
+            margin: 6px 0;
+            font-size: 14px
+        }
+
+        .hint {
+            margin-top: 12px;
+            color: #666;
+            font-size: 13px
+        }
+
+        .binary {
+            font-family: monospace;
+            color: #0b5;
+            letter-spacing: 2px
+        }
+    </style>
+</head>
+
+<body>
+    <div class="card">
+        <h1>اضغط أي زر على الكيبورد</h1>
+
+        <div class="row"><strong>Key (الرمز الظاهر):</strong><span id="key">—</span></div>
+        <div class="row"><strong>KeyCode (رقم):</strong><span id="keyCode">—</span></div>
+        <div class="row"><strong>Binary (8-bit):</strong><span id="binary" class="binary">—</span></div>
+
+        <div class="hint" dir="rtl">ملاحظة: بعض المتصفحات لا تدعم <code>keyCode</code> حديثًا، لكن معظمها لا يزال يرجع
+            قيمة رقمية.
+            العرض يحاول التعويض باستخدام char code لو احتاج الأمر.</div>
+    </div>
+
+    <script>
+        const elKey = document.getElementById('key');
+        const elCode = document.getElementById('code');
+        const elKeyCode = document.getElementById('keyCode');
+        const elBinary = document.getElementById('binary');
+
+        function to8bitBinary(n) {
+            if (typeof n !== 'number' || isNaN(n)) return '00000000';
+            // لو الرقم أكبر من 255 نعرض بعدد بيت مناسب (مثلاً 16)
+            const width = n > 255 ? 16 : 8;
+            return n.toString(2).padStart(width, '0');
+        }
+
+        window.addEventListener('keydown', (e) => {
+            // تجميع القيم
+            const key = e.key;           // الحرف أو الوصف مثل "a", "Enter"
+            const code = e.code;         // موقع المفتاح الفيزيائي مثل "KeyA", "ArrowUp"
+            // بعض المتصفحات ما ترجع keyCode في keydown لبعض المفاتيح، فنحاول fallback
+            let keyCode = e.keyCode ?? e.which ?? 0;
+            // لو key هي حرف واحد ونرجع 0، استخدم charCode كبديل
+            if (!keyCode && typeof key === 'string' && key.length === 1) {
+                keyCode = key.charCodeAt(0);
+            }
+
+            elKey.textContent = String(key);
+            elKeyCode.textContent = String(keyCode);
+            elBinary.textContent = to8bitBinary(keyCode);
+        });
+
+        // نمنع السلوك الافتراضي لبعض المفاتيح لو عايز تجرب (اختياري)
+        // window.addEventListener('keydown', e => { if (e.key === 'F1') e.preventDefault(); });
+    </script>
+</body>
+
+</html>
